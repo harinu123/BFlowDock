@@ -730,6 +730,34 @@ def eval_structure_prediction_losses(
 
     scores = lit_module.net.run_score_head(batch, embedding_iter_id=iter_id)
 
+    boltz2_terms = scores.get("boltz2_action") if isinstance(scores, dict) else None
+    boltz2_weight = float(getattr(lit_module.hparams.cfg.task, "boltz2_action_weight", 0.0))
+    if boltz2_terms is not None and boltz2_weight > 0:
+        action_total = boltz2_terms.get("total")
+        if action_total is not None and action_total.numel() > 0:
+            om_loss = action_total.mean()
+            loss = loss + boltz2_weight * om_loss
+            lit_module.log(
+                f"{stage}/boltz2_action_total",
+                action_total.mean().detach(),
+                on_epoch=True,
+                batch_size=batch_size,
+            )
+            if boltz2_terms.get("path") is not None:
+                lit_module.log(
+                    f"{stage}/boltz2_action_path",
+                    boltz2_terms["path"].mean().detach(),
+                    on_epoch=True,
+                    batch_size=batch_size,
+                )
+            if boltz2_terms.get("force") is not None:
+                lit_module.log(
+                    f"{stage}/boltz2_action_force",
+                    boltz2_terms["force"].mean().detach(),
+                    on_epoch=True,
+                    batch_size=batch_size,
+                )
+
     if lit_module.training:
         # # Sigmoid scaling
         # violation_loss_ratio = 1 / (
