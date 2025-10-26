@@ -23,6 +23,7 @@ from flowdock.models.components.cpm import (
     resolve_pl_contact_stack,
     resolve_protein_encoder,
 )
+from flowdock.models.components.boltz2 import resolve_boltz2_score_head
 from flowdock.models.components.esdm import (
     resolve_affinity_head,
     resolve_confidence_head,
@@ -189,9 +190,24 @@ class FlowDock(torch.nn.Module):
         )
 
         # structure denoising module
-        self.score_head = resolve_score_head(
-            self.protein_cfg, self.score_cfg, self.global_cfg, state_dict=pretrained_state_dict
-        )
+        score_backend = self.score_cfg.get("backend", "esdm")
+        self.score_backend = score_backend
+        if score_backend == "boltz2":
+            self.score_head = resolve_boltz2_score_head(
+                self.protein_cfg,
+                self.score_cfg,
+                self.global_cfg,
+                state_dict=pretrained_state_dict,
+            )
+        elif score_backend == "esdm":
+            self.score_head = resolve_score_head(
+                self.protein_cfg,
+                self.score_cfg,
+                self.global_cfg,
+                state_dict=pretrained_state_dict,
+            )
+        else:
+            raise ValueError(f"Unsupported score head backend: {score_backend}")
 
         # confidence prediction module
         if self.confidence_cfg.enabled:
